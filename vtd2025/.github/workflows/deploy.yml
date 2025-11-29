@@ -1,0 +1,55 @@
+name: Deploy Laravel to Hetzner
+
+on:
+  push:
+    branches:
+      - main   # adjust if you deploy from another branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, bcmath, intl, pdo_mysql
+          tools: composer
+
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Run tests
+        run: php artisan test
+
+      - name: Security audit
+        run: composer audit
+
+      - name: Deploy via SFTP
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          server: ${{ secrets.SFTP_HOST }}
+          port: ${{ secrets.SFTP_PORT }}
+          username: ${{ secrets.SFTP_USER }}
+          ssh_private_key: ${{ secrets.SFTP_KEY }}
+          local_path: './'
+          remote_path: ${{ secrets.REMOTE_PATH }}
+          exclude: |
+            .git*
+            node_modules
+            tests
+
+      - name: Run post-deploy commands
+        run: |
+          ssh -p ${{ secrets.SFTP_PORT }} -i ~/.ssh/id_ed25519 ${{ secrets.SFTP_USER }}@${{ secrets.SFTP_HOST }} << 'EOF'
+          cd /usr/www/users/vtd25
+          composer install --no-dev --optimize-autoloader
+          php artisan config:cache
+          php artisan migrate --force
+          php artisan route:cache
+          php artisan view:cache
+          EOF
