@@ -1,0 +1,42 @@
+name: Deploy to Hetzner
+ 
+on:
+  push:
+    branches:
+      - main   # runs only when pushing to main branch
+ 
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      # 1. Checkout repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+ 
+      # 2. Set up PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, bcmath, intl, pdo, mysql
+          coverage: none
+ 
+      # 3. Install dependencies (inside vtd2025 folder)
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader
+        working-directory: ./vtd2025
+ 
+      # 4. Deploy via SFTP to Hetzner
+      - name: Deploy to Hetzner
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          server: ${{ secrets.SFTP_HOST }}
+          port: ${{ secrets.SFTP_PORT }}
+          username: ${{ secrets.SFTP_USER }}
+          ssh_private_key: ${{ secrets.SFTP_KEY }}
+          local_path: ./vtd2025
+          remote_path: ${{ secrets.REMOTE_PATH }}
+          delete_remote_files: false
+
+
